@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>蒙特卡洛面积估算器 | 交互式网页版</title>
+    <link rel="icon" type="image/png" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎲</text></svg>">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        .canvas-panel {
+            flex: 2;
+            min-width: 500px;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+
+        .controls-panel {
+            flex: 1;
+            min-width: 250px;
+            padding: 20px;
+            background: white;
+            border-left: 1px solid #e0e0e0;
+        }
+
+        canvas {
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            background: white;
+            cursor: crosshair;
+            width: 100%;
+            height: auto;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .info-box {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .info-item {
+            margin: 10px 0;
+            padding: 8px;
+            background: rgba(255,255,255,0.7);
+            border-radius: 8px;
+        }
+
+        .info-label {
+            font-weight: bold;
+            color: #667eea;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .info-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+            margin-top: 5px;
+        }
+
+        .error-value {
+            color: #ff6b6b;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102,126,234,0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .slider-container {
+            margin: 15px 0;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        .vertex-list {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 10px;
+            font-size: 12px;
+        }
+
+        .vertex-item {
+            padding: 4px;
+            font-family: monospace;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .status-info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        h3 {
+            margin: 15px 0 10px 0;
+            color: #667eea;
+            font-size: 18px;
+        }
+
+        hr {
+            margin: 15px 0;
+            border: none;
+            border-top: 1px solid #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>🎲 蒙特卡洛面积估算器</h1>
+        <p>交互式网页版 | 点击绘制多边形 | 实时估算面积</p>
+    </div>
+    <div class="content">
+        <div class="canvas-panel">
+            <canvas id="canvas" width="600" height="600"></canvas>
+            <div style="margin-top: 10px; text-align: center; font-size: 12px; color: #666;">
+                💡 操作提示：左键点击添加顶点 | 右键点击闭合多边形并开始估算
+            </div>
+        </div>
+        <div class="controls-panel">
+            <div class="info-box">
+                <div class="info-item">
+                    <div class="info-label">📊 蒙特卡洛估算面积</div>
+                    <div class="info-value" id="estimatedArea">—</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">📏 理论面积（鞋带公式）</div>
+                    <div class="info-value" id="theoreticalArea">—</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">📈 相对误差</div>
+                    <div class="info-value" id="error">—</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">🎯 采样点数</div>
+                    <div class="info-value" id="nPoints">20,000</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">🔴 内部点 / ⚫ 总点数</div>
+                    <div class="info-value" id="insideCount">—</div>
+                </div>
+            </div>
+
+            <div class="slider-container">
+                <label>🎲 调整采样点数：</label>
+                <input type="range" id="nPointsSlider" min="1000" max="50000" step="1000" value="20000">
+                <div style="display: flex; justify-content: space-between;">
+                    <span>1,000</span>
+                    <span>50,000</span>
+                </div>
+            </div>
+
+            <button id="resetBtn" class="btn-danger">🗑️ 重置所有顶点</button>
+            <button id="estimateBtn" class="btn-success">🎯 直接估算当前多边形</button>
+
+            <h3>📌 当前顶点列表</h3>
+            <div id="vertexList" class="vertex-list">
+                暂无顶点，点击画布添加
+            </div>
+
+            <div id="status" class="status status-info">
+                ✅ 就绪 | 点击画布添加顶点
+            </div>
+
+            <hr>
+            <div style="font-size: 11px; color: #999; text-align: center;">
+                💡 提示：右键点击闭合多边形 | 顶点数≥3才能估算
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    class MonteCarloAreaEstimator {
+        constructor(canvasId) {
+            this.canvas = document.getElementById(canvasId);
+            this.ctx = this.canvas.getContext('2d');
+            
+            // 坐标范围 0-10，映射到 canvas 600x600
+            this.xMin = 0;
+            this.xMax = 10;
+            this.yMin = 0;
+            this.yMax = 10;
+            this.canvasSize = 600;
+            
+            // 多边形顶点
+            this.vertices = [];
+            
+            // 采样点数
+            this.nPoints = 20000;
+            
+            // 估算结果存储
+            this.lastEstimate = null;
+            this.lastInsidePoints = [];
+            this.lastOutsidePoints = [];
+            
+            // 绑定事件
+            this.canvas.addEventListener('click', this.handleClick.bind(this));
+            this.canvas.addEventListener('contextmenu', this.handleRightClick.bind(this));
+            
+            // UI元素绑定
+            this.slider = document.getElementById('nPointsSlider');
+            this.resetBtn = document.getElementById('resetBtn');
+            this.estimateBtn = document.getElementById('estimateBtn');
+            
+            this.slider.addEventListener('input', (e) => {
+                this.nPoints = parseInt(e.target.value);
+                document.getElementById('nPoints').innerText = this.nPoints.toLocaleString();
+                // 如果有估算结果，重新估算
+                if (this.vertices.length >= 3) {
+                    this.runEstimation();
+                }
+            });
+            
+            this.resetBtn.addEventListener('click', () => {
+                this.reset();
+            });
+            
+            this.estimateBtn.addEventListener('click', () => {
+                if (this.vertices.length >= 3) {
+                    this.runEstimation();
+                } else {
+                    this.showStatus('⚠️ 至少需要3个顶点才能估算！', 'status-info');
+                }
+            });
+            
+            // 绘制初始状态
+            this.draw();
+        }
+        
+        // 坐标转换：canvas坐标 -> 数学坐标
+        canvasToMath(x, y) {
+            const rect = this.canvas.getBoundingClientRect();
+            const scaleX = this.canvasSize / rect.width;
+            const scaleY = this.canvasSize / rect.height;
+            
+            const canvasX = (x - rect.left) * scaleX;
+            const canvasY = (y - rect.top) * scaleY;
+            
+            const mathX = (canvasX / this.canvasSize) * (this.xMax - this.xMin) + this.xMin;
+            const mathY = ((this.canvasSize - canvasY) / this.canvasSize) * (this.yMax - this.yMin) + this.yMin;
+            
+            return { x: mathX, y: mathY };
+        }
+        
+        // 数学坐标 -> canvas坐标
+        mathToCanvas(x, y) {
+            const canvasX = ((x - this.xMin) / (this.xMax - this.xMin)) * this.canvasSize;
+            const canvasY = this.canvasSize - ((y - this.yMin) / (this.yMax - this.yMin)) * this.canvasSize;
+            return { x: canvasX, y: canvasY };
+        }
+        
+        handleClick(e) {
+            const { x, y } = this.canvasToMath(e.clientX, e.clientY);
+            this.vertices.push({ x, y });
+            this.updateVertexList();
+            this.draw();
+            this.showStatus(`✅ 添加顶点 (${x.toFixed(2)}, ${y.toFixed(2)}) | 当前顶点数: ${this.vertices.length}`, 'status-info');
+        }
+        
+        handleRightClick(e) {
+            e.preventDefault();
+            if (this.vertices.length >= 3) {
+                this.runEstimation();
+            } else {
+                this.showStatus(`⚠️ 当前只有 ${this.vertices.length} 个顶点，至少需要3个顶点才能闭合！`, 'status-info');
+            }
+            return false;
+        }
+        
+        reset() {
+            this.vertices = [];
+            this.lastEstimate = null;
+            this.lastInsidePoints = [];
+            this.lastOutsidePoints = [];
+            this.updateVertexList();
+            this.draw();
+            document.getElementById('estimatedArea').innerText = '—';
+            document.getElementById('theoreticalArea').innerText = '—';
+            document.getElementById('error').innerText = '—';
+            document.getElementById('insideCount').innerText = '—';
+            this.showStatus('🗑️ 已重置所有顶点，可以开始新图形啦！', 'status-info');
+        }
+        
+        updateVertexList() {
+            const container = document.getElementById('vertexList');
+            if (this.vertices.length === 0) {
+                container.innerHTML = '暂无顶点，点击画布添加';
+                return;
+            }
+            
+            let html = '';
+            this.vertices.forEach((v, idx) => {
+                html += `<div class="vertex-item">顶点 ${idx + 1}: (${v.x.toFixed(2)}, ${v.y.toFixed(2)})</div>`;
+            });
+            container.innerHTML = html;
+        }
+        
+        // 鞋带公式计算理论面积
+        calculateTheoreticalArea(vertices) {
+            if (vertices.length < 3) return 0;
+            
+            let area = 0;
+            const n = vertices.length;
+            for (let i = 0; i < n; i++) {
+                const v1 = vertices[i];
+                const v2 = vertices[(i + 1) % n];
+                area += v1.x * v2.y - v2.x * v1.y;
+            }
+            return Math.abs(area) / 2;
+        }
+        
+        // 判断点是否在多边形内（射线法）
+        isPointInPolygon(point, vertices) {
+            let inside = false;
+            for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
+                const xi = vertices[i].x, yi = vertices[i].y;
+                const xj = vertices[j].x, yj = vertices[j].y;
+                
+                const intersect = ((yi > point.y) != (yj > point.y)) &&
+                    (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        }
+        
+        // 蒙特卡洛估算
+        runEstimation() {
+            if (this.vertices.length < 3) return;
+            
+            // 计算包围盒
+            let minX = Math.min(...this.vertices.map(v => v.x));
+            let maxX = Math.max(...this.vertices.map(v => v.x));
+            let minY = Math.min(...this.vertices.map(v => v.y));
+            let maxY = Math.max(...this.vertices.map(v => v.y));
+            
+            const bboxArea = (maxX - minX) * (maxY - minY);
+            
+            if (bboxArea === 0) {
+                this.showStatus('❌ 多边形面积为0，无法估算', 'status-info');
+                return;
+            }
+            
+            // 随机撒点
+            const insidePoints = [];
+            const outsidePoints = [];
+            
+            for (let i = 0; i < this.nPoints; i++) {
+                const x = minX + Math.random() * (maxX - minX);
+                const y = minY + Math.random() * (maxY - minY);
+                const point = { x, y };
+                
+                if (this.isPointInPolygon(point, this.vertices)) {
+                    insidePoints.push(point);
+                } else {
+                    outsidePoints.push(point);
+                }
+            }
+            
+            const nInside = insidePoints.length;
+            const estimatedArea = (nInside / this.nPoints) * bboxArea;
+            const theoreticalArea = this.calculateTheoreticalArea(this.vertices);
+            
+            let error = 0;
+            if (theoreticalArea > 0) {
+                error = Math.abs(estimatedArea - theoreticalArea) / theoreticalArea * 100;
+            }
+            
+            // 保存结果用于绘图
+            this.lastEstimate = {
+                estimatedArea,
+                theoreticalArea,
+                error,
+                nInside,
+                bbox: { minX, maxX, minY, maxY }
+            };
+            this.lastInsidePoints = insidePoints;
+            this.lastOutsidePoints = outsidePoints;
+            
+            // 更新UI
+            document.getElementById('estimatedArea').innerText = estimatedArea.toFixed(4);
+            document.getElementById('theoreticalArea').innerText = theoreticalArea.toFixed(4);
+            document.getElementById('error').innerText = error.toFixed(2) + '%';
+            document.getElementById('insideCount').innerText = `${nInside.toLocaleString()} / ${this.nPoints.toLocaleString()}`;
+            
+            this.showStatus(`✅ 估算完成！估算面积: ${estimatedArea.toFixed(4)} | 理论面积: ${theoreticalArea.toFixed(4)} | 误差: ${error.toFixed(2)}%`, 'status-success');
+            
+            // 重绘（会显示采样点）
+            this.draw();
+        }
+        
+        draw() {
+            this.ctx.clearRect(0, 0, this.canvasSize, this.canvasSize);
+            
+            // 绘制网格
+            this.drawGrid();
+            
+            // 绘制采样点（如果有估算结果）
+            if (this.lastEstimate && this.lastInsidePoints.length > 0) {
+                this.drawSamplingPoints();
+            }
+            
+            // 绘制多边形
+            if (this.vertices.length > 0) {
+                this.drawPolygon();
+            }
+            
+            // 绘制顶点
+            if (this.vertices.length > 0) {
+                this.drawVertices();
+            }
+        }
+        
+        drawGrid() {
+            this.ctx.save();
+            this.ctx.strokeStyle = '#e0e0e0';
+            this.ctx.lineWidth = 0.5;
+            
+            // 绘制网格线（每1个单位）
+            for (let x = this.xMin; x <= this.xMax; x += 1) {
+                const start = this.mathToCanvas(x, this.yMin);
+                const end = this.mathToCanvas(x, this.yMax);
+                this.ctx.beginPath();
+                this.ctx.moveTo(start.x, start.y);
+                this.ctx.lineTo(end.x, end.y);
+                this.ctx.stroke();
+            }
+            
+            for (let y = this.yMin; y <= this.yMax; y += 1) {
+                const start = this.mathToCanvas(this.xMin, y);
+                const end = this.mathToCanvas(this.xMax, y);
+                this.ctx.beginPath();
+                this.ctx.moveTo(start.x, start.y);
+                this.ctx.lineTo(end.x, end.y);
+                this.ctx.stroke();
+            }
+            
+            // 绘制边界
+            this.ctx.strokeStyle = '#999';
+            this.ctx.lineWidth = 2;
+            const topLeft = this.mathToCanvas(this.xMin, this.yMax);
+            const topRight = this.mathToCanvas(this.xMax, this.yMax);
+            const bottomLeft = this.mathToCanvas(this.xMin, this.yMin);
+            const bottomRight = this.mathToCanvas(this.xMax, this.yMin);
+            
+            this.ctx.beginPath();
+            this.ctx.moveTo(topLeft.x, topLeft.y);
+            this.ctx.lineTo(topRight.x, topRight.y);
+            this.ctx.lineTo(bottomRight.x, bottomRight.y);
+            this.ctx.lineTo(bottomLeft.x, bottomLeft.y);
+            this.ctx.closePath();
+            this.ctx.stroke();
+            
+            this.ctx.restore();
+        }
+        
+        drawPolygon() {
+            if (this.vertices.length < 2) return;
+            
+            // 绘制填充
+            if (this.vertices.length >= 3) {
+                this.ctx.beginPath();
+                const first = this.mathToCanvas(this.vertices[0].x, this.vertices[0].y);
+                this.ctx.moveTo(first.x, first.y);
+                for (let i = 1; i < this.vertices.length; i++) {
+                    const point = this.mathToCanvas(this.vertices[i].x, this.vertices[i].y);
+                    this.ctx.lineTo(point.x, point.y);
+                }
+                this.ctx.closePath();
+                this.ctx.fillStyle = 'rgba(102, 126, 234, 0.2)';
+                this.ctx.fill();
+                this.ctx.strokeStyle = '#667eea';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+            } else {
+                // 只画线
+                this.ctx.beginPath();
+                const first = this.mathToCanvas(this.vertices[0].x, this.vertices[0].y);
+                this.ctx.moveTo(first.x, first.y);
+                for (let i = 1; i < this.vertices.length; i++) {
+                    const point = this.mathToCanvas(this.vertices[i].x, this.vertices[i].y);
+                    this.ctx.lineTo(point.x, point.y);
+                }
+                this.ctx.strokeStyle = '#667eea';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+            }
+        }
+        
+        drawVertices() {
+            for (const v of this.vertices) {
+                const point = this.mathToCanvas(v.x, v.y);
+                this.ctx.beginPath();
+                this.ctx.arc(point.x, point.y, 5, 0, 2 * Math.PI);
+                this.ctx.fillStyle = '#667eea';
+                this.ctx.fill();
+                this.ctx.strokeStyle = 'white';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+            }
+        }
+        
+        drawSamplingPoints() {
+            if (!this.lastEstimate) return;
+            
+            const { bbox } = this.lastEstimate;
+            
+            // 绘制外部点（灰色，小点）
+            for (const point of this.lastOutsidePoints) {
+                const canvasPoint = this.mathToCanvas(point.x, point.y);
+                this.ctx.fillStyle = 'rgba(128, 128, 128, 0.3)';
+                this.ctx.beginPath();
+                this.ctx.arc(canvasPoint.x, canvasPoint.y, 1.5, 0, 2 * Math.PI);
+                this.ctx.fill();
+            }
+            
+            // 绘制内部点（红色）
+            for (const point of this.lastInsidePoints) {
+                const canvasPoint = this.mathToCanvas(point.x, point.y);
+                this.ctx.fillStyle = 'rgba(220, 53, 69, 0.6)';
+                this.ctx.beginPath();
+                this.ctx.arc(canvasPoint.x, canvasPoint.y, 2, 0, 2 * Math.PI);
+                this.ctx.fill();
+            }
+        }
+        
+        showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status ${type}`;
+            statusDiv.innerHTML = message;
+            
+            // 3秒后恢复（如果不是成功消息）
+            if (type !== 'status-success') {
+                setTimeout(() => {
+                    if (statusDiv.innerHTML === message) {
+                        statusDiv.className = 'status status-info';
+                        statusDiv.innerHTML = '✅ 就绪 | 点击画布添加顶点';
+                    }
+                }, 3000);
+            }
+        }
+    }
+    
+    // 初始化应用
+    window.addEventListener('load', () => {
+        new MonteCarloAreaEstimator('canvas');
+    });
+    
+    // 禁止右键默认菜单
+    document.addEventListener('contextmenu', (e) => {
+        if (e.target.tagName === 'CANVAS') {
+            e.preventDefault();
+        }
+    });
+</script>
+</body>
+</html>
