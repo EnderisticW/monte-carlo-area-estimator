@@ -1,6 +1,7 @@
 # 🎲 蒙特卡洛面积估算器
 
 一个交互式网页工具，通过蒙特卡洛方法估算任意封闭多边形的面积。
+[![GitHub Pages](https://img.shields.io/badge/在线演示-蒙特卡洛面积估算器-blue)](https://EnderisticW.github.io/monte-carlo-area-estimator/)
 
 ## ✨ 功能
 
